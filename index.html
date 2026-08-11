@@ -207,34 +207,76 @@
 
   /* ---------------- OpenCV loading ---------------- */
 
-  function loadOpenCV() {
-    if (window.__cvLoading) return window.__cvLoading;
-    window.__cvLoading = new Promise((resolve, reject) => {
+  const CV_SOURCES = [
+    "https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js",
+    "https://docs.opencv.org/4.10.0/opencv.js",
+    "https://docs.opencv.org/4.x/opencv.js",
+    "https://unpkg.com/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js"
+  ];
+
+  function injectScript(url, timeoutMs) {
+    return new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = "https://docs.opencv.org/4.10.0/opencv.js";
-      s.async = true;
-      s.onerror = () => reject(new Error("Couldn't download the vision library. Check your connection."));
-      s.onload = () => {
-        const ready = () => {
-          try {
-            orb = new cv.ORB();
-            try { orb.setMaxFeatures(900); } catch (_) {}
-            try { matcher = new cv.BFMatcher(cv.NORM_HAMMING, false); }
-            catch (_) { matcher = new cv.BFMatcher(); }
-            cvReady = true;
-            resolve();
-          } catch (e) { reject(e); }
-        };
-        const poll = () => {
-          if (window.cv && cv.Mat) return ready();
-          if (window.cv && typeof cv.then === "function") return cv.then(c => { window.cv = c; ready(); });
-          if (window.cv) { cv.onRuntimeInitialized = ready; return; }
-          setTimeout(poll, 80);
-        };
-        poll();
-      };
+      let done = false;
+      const finish = (fn, arg) => { if (!done) { done = true; fn(arg); } };
+      s.src = url; s.async = true;
+      s.onload = () => finish(resolve);
+      s.onerror = () => finish(reject, new Error("blocked or unreachable"));
+      setTimeout(() => finish(reject, new Error("timed out")), timeoutMs);
       document.head.appendChild(s);
     });
+  }
+
+  // The wasm runtime finishes booting after the script itself loads.
+  function waitForRuntime(timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const poll = () => {
+        if (window.cv && window.cv.Mat && window.cv.ORB) return resolve();
+        if (window.cv && typeof window.cv.then === "function") {
+          return window.cv.then(c => { window.cv = c; resolve(); }, reject);
+        }
+        if (window.cv && !window.cv.__hooked) {
+          window.cv.__hooked = true;
+          window.cv.onRuntimeInitialized = () => resolve();
+        }
+        if (Date.now() > deadline) return reject(new Error("runtime never started"));
+        setTimeout(poll, 100);
+      };
+      poll();
+    });
+  }
+
+  function loadOpenCV() {
+    if (window.__cvLoading) return window.__cvLoading;
+    window.__cvLoading = (async () => {
+      const failures = [];
+      for (let i = 0; i < CV_SOURCES.length; i++) {
+        const url = CV_SOURCES[i];
+        const host = url.split("/")[2];
+        try {
+          setStatus("Loading matcher (" + (i + 1) + "/" + CV_SOURCES.length + ")…");
+          await injectScript(url, 60000);
+          await waitForRuntime(60000);
+          orb = new cv.ORB();
+          try { orb.setMaxFeatures(900); } catch (_) {}
+          try { matcher = new cv.BFMatcher(cv.NORM_HAMMING, false); }
+          catch (_) { matcher = new cv.BFMatcher(); }
+          cvReady = true;
+          return;
+        } catch (err) {
+          failures.push(host + " — " + err.message);
+          delete window.cv;
+        }
+      }
+      const sandboxed = window.self !== window.top;
+      throw new Error(
+        (sandboxed
+          ? "Blocked by the preview sandbox. Open this file on a real https:// page instead of inside an embedded preview. "
+          : "All four sources failed — likely a firewall, VPN, or content blocker. ") +
+        "Tried: " + failures.join(" · ")
+      );
+    })();
     return window.__cvLoading;
   }
 
