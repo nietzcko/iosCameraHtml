@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0B0E13">
-<title>Scope — live object detection</title>
+<title>Scope — find your object</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,50 +26,27 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;margin:0}
   body{
-    background:var(--ink);
-    color:var(--bone);
+    background:var(--ink);color:var(--bone);
     font-family:"Archivo",system-ui,-apple-system,sans-serif;
-    overflow:hidden;
-    overscroll-behavior:none;
-    display:flex;
-    flex-direction:column;
+    overflow:hidden;overscroll-behavior:none;display:flex;flex-direction:column;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
-  /* ---------- header ---------- */
-  header{
-    display:flex;align-items:center;justify-content:space-between;
-    gap:12px;padding:12px 16px 10px;flex:none;
-  }
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 10px;flex:none}
   .wordmark{display:flex;align-items:baseline;gap:8px}
-  .wordmark h1{
-    margin:0;font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  }
-  .wordmark span{
-    font-family:"DM Mono",ui-monospace,monospace;font-size:10px;color:var(--dim);letter-spacing:.08em;
-  }
-  .readout{
-    font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);
-    display:flex;align-items:center;gap:8px;white-space:nowrap;
-  }
+  .wordmark h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .wordmark span{font-family:"DM Mono",ui-monospace,monospace;font-size:10px;color:var(--dim);letter-spacing:.06em}
+  .readout{font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:8px;white-space:nowrap}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
   .dot.live{background:var(--signal);animation:pulse 1.6s ease-in-out infinite}
+  .dot.hit{background:#9BE38A;animation:none}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 
-  /* ---------- viewport ---------- */
-  .viewport{
-    flex:1;min-height:0;display:grid;place-items:center;padding:0 12px;position:relative;
-  }
-  .stage{
-    position:relative;width:100%;max-height:100%;aspect-ratio:var(--ar);
-    border-radius:18px;overflow:hidden;background:#05070A;
-    border:1px solid var(--edge);
-  }
-  video,canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .viewport{flex:1;min-height:0;display:grid;place-items:center;padding:0 12px;position:relative}
+  .stage{position:relative;width:100%;max-height:100%;aspect-ratio:var(--ar);border-radius:18px;overflow:hidden;background:#05070A;border:1px solid var(--edge)}
+  video,canvas.layer{position:absolute;inset:0;width:100%;height:100%;display:block}
   video{object-fit:cover}
   video.mirror{transform:scaleX(-1)}
-
-  /* corner ticks on the frame itself — the instrument housing */
   .stage::after{
     content:"";position:absolute;inset:10px;pointer-events:none;border-radius:8px;
     background:
@@ -83,397 +60,664 @@
       linear-gradient(var(--edge),var(--edge)) right bottom/1px 16px no-repeat;
   }
 
-  /* ---------- cover / start screen ---------- */
-  .cover{
-    position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:18px;text-align:center;
-    padding:28px;background:radial-gradient(120% 90% at 50% 0%,#151B26 0%,#05070A 70%);
-  }
+  .cover{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;text-align:center;padding:26px;background:radial-gradient(120% 90% at 50% 0%,#151B26 0%,#05070A 70%)}
   .cover[hidden]{display:none}
-  .cover p{
-    margin:0;max-width:30ch;color:var(--dim);font-size:14px;line-height:1.5;
-  }
-  .cover .lede{color:var(--bone);font-size:19px;font-weight:500;line-height:1.35;max-width:22ch}
-  .note{
-    font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);
-    border-top:1px solid var(--edge);padding-top:12px;max-width:34ch;line-height:1.6;
-  }
+  .cover .lede{margin:0;color:var(--bone);font-size:19px;font-weight:500;line-height:1.35;max-width:23ch}
+  .cover p{margin:0;max-width:31ch;color:var(--dim);font-size:14px;line-height:1.5}
+  .note{font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);
+    border-top:1px solid var(--edge);padding-top:12px;max-width:34ch;line-height:1.6}
   .note b{color:var(--signal);font-weight:400}
 
-  /* ---------- controls ---------- */
-  .controls{
-    flex:none;padding:12px 16px 18px;display:flex;flex-direction:column;gap:12px;
-  }
-  .roster{
-    min-height:30px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-  }
-  .roster::-webkit-scrollbar{display:none}
-  .chip{
-    font-family:"DM Mono",ui-monospace,monospace;font-size:11px;
-    padding:6px 10px;border-radius:999px;white-space:nowrap;flex:none;
-    border:1px solid currentColor;background:rgba(255,255,255,.04);
-  }
-  .chip.empty{color:var(--dim);border-color:var(--edge)}
-  .chip b{font-weight:500}
+  .controls{flex:none;padding:10px 16px 16px;display:flex;flex-direction:column;gap:12px}
+
+  .targets{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;min-height:64px;align-items:center}
+  .targets::-webkit-scrollbar{display:none}
+  .card{flex:none;width:112px;border:1px solid var(--edge);border-radius:12px;overflow:hidden;
+    background:var(--panel);position:relative;transition:border-color .18s ease}
+  .card.seen{border-color:#9BE38A}
+  .card img{width:100%;height:44px;object-fit:cover;display:block;opacity:.7}
+  .card.seen img{opacity:1}
+  .card .meta{padding:5px 7px;display:flex;align-items:center;justify-content:space-between;gap:4px}
+  .card .nm{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .sc{font-family:"DM Mono",ui-monospace,monospace;font-size:10px;color:var(--dim)}
+  .card.seen .sc{color:#9BE38A}
+  .card .del{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:0;padding:0;
+    background:rgba(5,7,10,.72);color:var(--bone);font-size:13px;line-height:20px}
+  .empty-hint{font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;color:var(--dim);line-height:1.6}
 
   .row{display:flex;align-items:center;gap:10px}
-  button{
-    font-family:inherit;font-size:14px;font-weight:500;color:var(--bone);
-    background:var(--panel);border:1px solid var(--edge);border-radius:14px;
-    padding:14px 16px;cursor:pointer;transition:transform .12s ease,background .2s ease;
-    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  }
+  button{font-family:inherit;font-size:14px;font-weight:500;color:var(--bone);background:var(--panel);
+    border:1px solid var(--edge);border-radius:14px;padding:14px 16px;cursor:pointer;
+    transition:transform .12s ease,background .2s ease;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
   button:active{transform:scale(.97)}
   button:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
   button[disabled]{opacity:.45;cursor:default}
-  .primary{
-    flex:1;background:var(--signal);color:#14100A;border-color:transparent;font-weight:700;
-    letter-spacing:.06em;text-transform:uppercase;font-size:13px;padding:16px;
-  }
+  .primary{flex:1;background:var(--signal);color:#14100A;border-color:transparent;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;font-size:13px;padding:16px}
   .primary.is-running{background:transparent;color:var(--stop);border-color:var(--stop)}
-  .icon{width:52px;padding:14px 0;flex:none;font-size:17px;line-height:1}
+  .icon{width:52px;padding:14px 0;flex:none;font-size:17px;line-height:1;text-align:center}
 
-  .slider{
-    display:flex;align-items:center;gap:12px;font-family:"DM Mono",ui-monospace,monospace;
-    font-size:11px;color:var(--dim);
-  }
-  .slider label{flex:none;letter-spacing:.06em}
-  input[type=range]{
-    flex:1;-webkit-appearance:none;appearance:none;height:2px;border-radius:2px;
-    background:var(--edge);outline:none;
-  }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
-    background:var(--bone);border:4px solid var(--ink);box-shadow:0 0 0 1px var(--edge);
-  }
-  input[type=range]:focus-visible::-webkit-slider-thumb{background:var(--signal)}
-  #thrVal{flex:none;width:34px;text-align:right;color:var(--bone)}
+  .slider{display:flex;align-items:center;gap:12px;font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--dim)}
+  .slider label{flex:none;letter-spacing:.05em}
+  input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:2px;border-radius:2px;background:var(--edge);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:var(--bone);border:4px solid var(--ink);box-shadow:0 0 0 1px var(--edge)}
+  #strictVal{flex:none;width:56px;text-align:right;color:var(--bone)}
 
-  .error{
-    color:var(--stop);font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;
-    line-height:1.6;text-align:center;padding:0 4px;
-  }
+  .error{color:var(--stop);font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;line-height:1.6;text-align:center}
   .error:empty{display:none}
 
-  @media (prefers-reduced-motion:reduce){
-    *{animation:none!important;transition:none!important}
-  }
+  .sheet{position:fixed;inset:0;z-index:20;background:rgba(5,7,10,.92);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+  .sheet[hidden]{display:none}
+  .sheet h2{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:8px 0 4px}
+  .sheet .sub{font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;color:var(--dim);line-height:1.6;margin:0 0 12px}
+  .cropWrap{flex:1;min-height:0;display:grid;place-items:center;background:#05070A;border:1px solid var(--edge);border-radius:14px;overflow:hidden}
+  #cropCanvas{max-width:100%;max-height:100%;touch-action:none;display:block}
+  .sheet .field{margin-top:12px}
+  input[type=text]{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:12px;
+    color:var(--bone);font-family:inherit;font-size:15px;padding:13px 14px;outline:none}
+  input[type=text]:focus{border-color:var(--signal)}
+  .sheet .actions{display:flex;gap:10px;margin-top:10px}
+  .sheet .actions button{flex:1}
+  .hidden-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="wordmark">
-    <h1>Scope</h1>
-    <span>COCO-SSD · 80 classes</span>
-  </div>
-  <div class="readout">
-    <span class="dot" id="dot"></span>
-    <span id="status">Idle</span>
-  </div>
+  <div class="wordmark"><h1>Scope</h1><span>reference match</span></div>
+  <div class="readout"><span class="dot" id="dot"></span><span id="status">Idle</span></div>
 </header>
 
 <div class="viewport">
   <div class="stage" id="stage">
     <video id="video" playsinline webkit-playsinline muted autoplay></video>
-    <canvas id="overlay"></canvas>
-
+    <canvas id="overlay" class="layer"></canvas>
     <div class="cover" id="cover">
-      <p class="lede">Point the camera at anything. Objects get boxed and named in real time.</p>
-      <p>Everything runs on this device — no frames are uploaded.</p>
-      <p class="note" id="note">First run downloads a <b>~7 MB</b> model. Keep the tab open while it loads.</p>
+      <p class="lede">Teach it one object, then it finds that object.</p>
+      <p>Photograph the thing you care about — a book, a box, a label, a toy. It gets boxed whenever it comes into view.</p>
+      <p class="note" id="note">Matching runs on <b>surface detail</b>: print, texture, pattern. A plain white cup has nothing to match on.</p>
     </div>
   </div>
 </div>
 
 <div class="controls">
-  <div class="roster" id="roster"><span class="chip empty">Nothing detected yet</span></div>
+  <div class="targets" id="targets"></div>
   <div class="row">
     <button class="primary" id="toggle">Start camera</button>
+    <button class="icon" id="teach" title="Teach an object" aria-label="Teach an object">＋</button>
     <button class="icon" id="flip" title="Switch camera" aria-label="Switch camera" disabled>⟲</button>
   </div>
   <div class="slider">
-    <label for="thr">MIN CONFIDENCE</label>
-    <input type="range" id="thr" min="10" max="90" step="5" value="45">
-    <span id="thrVal">45%</span>
+    <label for="strict">STRICTNESS</label>
+    <input type="range" id="strict" min="8" max="34" step="2" value="16">
+    <span id="strictVal">16 pts</span>
   </div>
   <div class="error" id="error"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<div class="sheet" id="sheet" hidden>
+  <h2>Mark the object</h2>
+  <p class="sub" id="cropHint">Drag a box around it. Tight is better — leave the background out.</p>
+  <div class="cropWrap"><canvas id="cropCanvas"></canvas></div>
+  <div class="field"><input type="text" id="nameInput" placeholder="Name it (e.g. my keys)" maxlength="24"></div>
+  <div class="actions">
+    <button id="cancelTeach">Cancel</button>
+    <button id="saveTeach" class="primary">Save object</button>
+  </div>
+</div>
+
+<input type="file" id="fileInput" class="hidden-input" accept="image/*">
+
 <script>
 (() => {
   "use strict";
 
-  const video   = document.getElementById("video");
-  const canvas  = document.getElementById("overlay");
-  const ctx     = canvas.getContext("2d");
-  const stage   = document.getElementById("stage");
-  const cover   = document.getElementById("cover");
-  const note    = document.getElementById("note");
-  const toggle  = document.getElementById("toggle");
-  const flipBtn = document.getElementById("flip");
-  const statusEl= document.getElementById("status");
-  const dot     = document.getElementById("dot");
-  const roster  = document.getElementById("roster");
-  const errEl   = document.getElementById("error");
-  const thr     = document.getElementById("thr");
-  const thrVal  = document.getElementById("thrVal");
+  const $ = (id) => document.getElementById(id);
+  const video = $("video"), overlay = $("overlay"), ctx = overlay.getContext("2d");
+  const stage = $("stage"), cover = $("cover"), note = $("note");
+  const toggle = $("toggle"), flipBtn = $("flip"), teachBtn = $("teach");
+  const statusEl = $("status"), dot = $("dot"), errEl = $("error");
+  const targetsEl = $("targets"), strict = $("strict"), strictVal = $("strictVal");
+  const sheet = $("sheet"), cropCanvas = $("cropCanvas"), cropCtx = cropCanvas.getContext("2d");
+  const nameInput = $("nameInput"), fileInput = $("fileInput"), cropHint = $("cropHint");
 
-  const PALETTE = [
-    "#FFB347", "#5AD1E6", "#FF6B5A", "#9BE38A",
-    "#C69BFF", "#F2E85C", "#FF9AC4", "#7FA6FF"
-  ];
-  const colorFor = (label) => {
-    let h = 0;
-    for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
-    return PALETTE[h % PALETTE.length];
+  const PALETTE = ["#FFB347","#5AD1E6","#9BE38A","#C69BFF","#FF9AC4","#F2E85C"];
+  const PROC_MAX = 512;    // live frame is analysed at this longest edge
+  const REF_MAX  = 560;    // reference crops stored at this longest edge
+  const RATIO    = 0.72;   // Lowe ratio test
+  const STORE_KEY = "scope.targets.v1";
+
+  let cvReady = false, stream = null, running = false, facing = "environment";
+  let targets = [];        // {id,name,color,thumb,des,pts,w,h,hit,score}
+  let minInliers = 16, fpsSmooth = 0, wakeLock = null;
+  let orb = null, matcher = null;
+  const proc = document.createElement("canvas");
+  const procCtx = proc.getContext("2d", { willReadFrequently: true });
+
+  const setStatus = (t, cls) => { statusEl.textContent = t; dot.className = "dot" + (cls ? " " + cls : ""); };
+  const setError = (t) => { errEl.textContent = t || ""; };
+  const safeDelete = (m) => { try { m && m.delete && m.delete(); } catch (_) {} };
+  const escapeHtml = (s) => s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+  /* ---------------- OpenCV loading ---------------- */
+
+  function loadOpenCV() {
+    if (window.__cvLoading) return window.__cvLoading;
+    window.__cvLoading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://docs.opencv.org/4.10.0/opencv.js";
+      s.async = true;
+      s.onerror = () => reject(new Error("Couldn't download the vision library. Check your connection."));
+      s.onload = () => {
+        const ready = () => {
+          try {
+            orb = new cv.ORB();
+            try { orb.setMaxFeatures(900); } catch (_) {}
+            try { matcher = new cv.BFMatcher(cv.NORM_HAMMING, false); }
+            catch (_) { matcher = new cv.BFMatcher(); }
+            cvReady = true;
+            resolve();
+          } catch (e) { reject(e); }
+        };
+        const poll = () => {
+          if (window.cv && cv.Mat) return ready();
+          if (window.cv && typeof cv.then === "function") return cv.then(c => { window.cv = c; ready(); });
+          if (window.cv) { cv.onRuntimeInitialized = ready; return; }
+          setTimeout(poll, 80);
+        };
+        poll();
+      };
+      document.head.appendChild(s);
+    });
+    return window.__cvLoading;
+  }
+
+  /* ---------------- features ---------------- */
+
+  function featuresFromCanvas(el) {
+    const src = cv.imread(el);
+    const gray = new cv.Mat();
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    const kp = new cv.KeyPointVector();
+    const des = new cv.Mat();
+    const noMask = new cv.Mat();
+    orb.detectAndCompute(gray, noMask, kp, des);
+    const n = kp.size();
+    const pts = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { const p = kp.get(i).pt; pts[i*2] = p.x; pts[i*2+1] = p.y; }
+    const w = src.cols, h = src.rows;
+    src.delete(); gray.delete(); kp.delete(); noMask.delete();
+    return { des, pts, w, h };
+  }
+
+  function imageToCanvas(img, maxEdge) {
+    const s = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * s);
+    c.height = Math.round(img.height * s);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  const loadImage = (src) => new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => rej(new Error("That image couldn't be read."));
+    im.src = src;
+  });
+
+  /* ---------------- targets ---------------- */
+
+  async function buildTarget(rec) {
+    const img = await loadImage(rec.thumb);
+    const f = featuresFromCanvas(imageToCanvas(img, REF_MAX));
+    if (f.des.rows < 12) {
+      f.des.delete();
+      throw new Error("Not enough detail in that crop to recognise it later. Try a closer shot, brighter light, or a more patterned side.");
+    }
+    return Object.assign({}, rec, f, { hit: false, score: 0 });
+  }
+
+  function persist() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(
+        targets.map(t => ({ id: t.id, name: t.name, color: t.color, thumb: t.thumb }))));
+    } catch (_) { /* private mode or quota — session-only still works */ }
+  }
+
+  function renderTargets() {
+    if (!targets.length) {
+      targetsEl.innerHTML = '<span class="empty-hint">No objects yet — tap ＋ to teach one from a photo.</span>';
+      return;
+    }
+    targetsEl.innerHTML = targets.map(t => `
+      <div class="card ${t.hit ? "seen" : ""}" data-id="${t.id}">
+        <img src="${t.thumb}" alt="">
+        <div class="meta">
+          <span class="nm" style="color:${t.color}">${escapeHtml(t.name)}</span>
+          <span class="sc">${t.hit ? t.score : "—"}</span>
+        </div>
+        <button class="del" data-del="${t.id}" aria-label="Remove ${escapeHtml(t.name)}">×</button>
+      </div>`).join("");
+  }
+
+  function refreshCards() {
+    for (const t of targets) {
+      const card = targetsEl.querySelector('.card[data-id="' + t.id + '"]');
+      if (!card) continue;
+      card.classList.toggle("seen", t.hit);
+      card.querySelector(".sc").textContent = t.hit ? t.score : "—";
+    }
+  }
+
+  targetsEl.addEventListener("click", (e) => {
+    const id = e.target.dataset && e.target.dataset.del;
+    if (!id) return;
+    const i = targets.findIndex(t => t.id === id);
+    if (i >= 0) { safeDelete(targets[i].des); targets.splice(i, 1); }
+    persist(); renderTargets();
+  });
+
+  /* ---------------- teach flow ---------------- */
+
+  let cropImg = null, box = null, dragging = false, dragStart = null;
+
+  teachBtn.addEventListener("click", async () => {
+    setError("");
+    teachBtn.disabled = true;
+    try {
+      setStatus("Loading vision library…");
+      await loadOpenCV();
+      setStatus(running ? "Scanning…" : "Idle", running ? "live" : "");
+      if (running && video.videoWidth) {
+        const c = document.createElement("canvas");
+        c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext("2d").drawImage(video, 0, 0);
+        cropHint.textContent = "Drag a box around the object in this frame.";
+        openSheet(await loadImage(c.toDataURL("image/jpeg", 0.92)));
+      } else {
+        fileInput.value = "";
+        fileInput.click();
+      }
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      teachBtn.disabled = false;
+    }
+  });
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    try {
+      await loadOpenCV();
+      const url = URL.createObjectURL(file);
+      const img = await loadImage(url);
+      cropHint.textContent = "Drag a box around it. Tight is better — leave the background out.";
+      openSheet(img);
+      URL.revokeObjectURL(url);
+    } catch (err) { setError(err.message || String(err)); }
+  });
+
+  function openSheet(img) {
+    cropImg = img;
+    const maxW = Math.min(window.innerWidth - 32, 760);
+    const maxH = window.innerHeight * 0.52;
+    const s = Math.min(maxW / img.width, maxH / img.height);
+    cropCanvas.width = Math.round(img.width * s);
+    cropCanvas.height = Math.round(img.height * s);
+    box = { x: cropCanvas.width * 0.2, y: cropCanvas.height * 0.2,
+            w: cropCanvas.width * 0.6, h: cropCanvas.height * 0.6 };
+    drawCrop();
+    nameInput.value = "";
+    sheet.hidden = false;
+  }
+
+  function drawCrop() {
+    const W = cropCanvas.width, H = cropCanvas.height;
+    cropCtx.drawImage(cropImg, 0, 0, W, H);
+    cropCtx.fillStyle = "rgba(5,7,10,.62)";
+    cropCtx.fillRect(0, 0, W, H);
+    cropCtx.save();
+    cropCtx.beginPath();
+    cropCtx.rect(box.x, box.y, box.w, box.h);
+    cropCtx.clip();
+    cropCtx.drawImage(cropImg, 0, 0, W, H);
+    cropCtx.restore();
+    cropCtx.strokeStyle = "#FFB347";
+    cropCtx.lineWidth = 2;
+    cropCtx.strokeRect(box.x, box.y, box.w, box.h);
+    const arm = Math.min(box.w, box.h) * 0.2;
+    cropCtx.lineWidth = 5;
+    cropCtx.beginPath();
+    cropCtx.moveTo(box.x, box.y + arm); cropCtx.lineTo(box.x, box.y); cropCtx.lineTo(box.x + arm, box.y);
+    cropCtx.moveTo(box.x + box.w - arm, box.y + box.h); cropCtx.lineTo(box.x + box.w, box.y + box.h);
+    cropCtx.lineTo(box.x + box.w, box.y + box.h - arm);
+    cropCtx.stroke();
+  }
+
+  const cropPos = (e) => {
+    const r = cropCanvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (cropCanvas.width / r.width),
+             y: (e.clientY - r.top) * (cropCanvas.height / r.height) };
   };
+  cropCanvas.addEventListener("pointerdown", (e) => {
+    dragging = true; dragStart = cropPos(e);
+    try { cropCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  cropCanvas.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const p = cropPos(e);
+    box = { x: Math.min(dragStart.x, p.x), y: Math.min(dragStart.y, p.y),
+            w: Math.abs(p.x - dragStart.x), h: Math.abs(p.y - dragStart.y) };
+    drawCrop();
+  });
+  cropCanvas.addEventListener("pointerup", () => {
+    dragging = false;
+    if (box.w < 24 || box.h < 24) {
+      box = { x: cropCanvas.width * 0.2, y: cropCanvas.height * 0.2,
+              w: cropCanvas.width * 0.6, h: cropCanvas.height * 0.6 };
+      drawCrop();
+    }
+  });
 
-  let model = null;
-  let stream = null;
-  let running = false;
-  let facing = "environment";
-  let detections = [];
-  let threshold = 0.45;
-  let wakeLock = null;
-  let fpsSmooth = 0;
+  $("cancelTeach").addEventListener("click", () => { sheet.hidden = true; cropImg = null; });
 
-  const setStatus = (text, live = false) => {
-    statusEl.textContent = text;
-    dot.classList.toggle("live", live);
-  };
-  const setError = (text) => { errEl.textContent = text || ""; };
+  $("saveTeach").addEventListener("click", async () => {
+    const btn = $("saveTeach");
+    btn.disabled = true; btn.textContent = "Reading…";
+    try {
+      const sx = cropImg.width / cropCanvas.width, sy = cropImg.height / cropCanvas.height;
+      const cw = Math.max(32, Math.round(box.w * sx));
+      const ch = Math.max(32, Math.round(box.h * sy));
+      const s = Math.min(1, REF_MAX / Math.max(cw, ch));
+      const out = document.createElement("canvas");
+      out.width = Math.round(cw * s); out.height = Math.round(ch * s);
+      out.getContext("2d").drawImage(cropImg, Math.round(box.x * sx), Math.round(box.y * sy), cw, ch,
+                                     0, 0, out.width, out.height);
+      const rec = {
+        id: "t" + Date.now().toString(36),
+        name: (nameInput.value || "Object " + (targets.length + 1)).trim(),
+        color: PALETTE[targets.length % PALETTE.length],
+        thumb: out.toDataURL("image/jpeg", 0.85)
+      };
+      targets.push(await buildTarget(rec));
+      persist(); renderTargets();
+      sheet.hidden = true; cropImg = null; setError("");
+      if (!running) setStatus("Ready — start the camera");
+    } catch (err) {
+      setError(err.message || String(err));
+      sheet.hidden = true;
+    } finally {
+      btn.disabled = false; btn.textContent = "Save object";
+    }
+  });
 
-  /* ---------- camera ---------- */
+  /* ---------------- camera ---------------- */
 
   async function openCamera() {
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: {
-        facingMode: { ideal: facing },
-        width:  { ideal: 1280 },
-        height: { ideal: 720 }
-      }
+      video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     video.srcObject = stream;
     video.classList.toggle("mirror", facing === "user");
     await video.play();
-    await new Promise(res => {
-      if (video.videoWidth) return res();
-      video.onloadedmetadata = () => res();
-    });
+    if (!video.videoWidth) await new Promise(r => { video.onloadedmetadata = r; });
     fitStage();
   }
 
   function fitStage() {
-    const w = video.videoWidth  || 720;
-    const h = video.videoHeight || 960;
-    stage.style.setProperty("--ar", `${w} / ${h}`);
-    canvas.width = w;
-    canvas.height = h;
+    const w = video.videoWidth || 720, h = video.videoHeight || 960;
+    stage.style.setProperty("--ar", w + " / " + h);
+    overlay.width = w; overlay.height = h;
+    const s = Math.min(1, PROC_MAX / Math.max(w, h));
+    proc.width = Math.round(w * s); proc.height = Math.round(h * s);
   }
 
-  /* ---------- drawing ---------- */
+  /* ---------------- matching ---------------- */
 
-  function drawFrame() {
-    if (!running) return;
-    const W = canvas.width, H = canvas.height;
-    const S = Math.max(W, H) / 900;          // scale factor for strokes + text
-    const mirrored = facing === "user";
+  function matchTargets() {
+    procCtx.drawImage(video, 0, 0, proc.width, proc.height);
+    const scale = overlay.width / proc.width;
 
+    let frame;
+    try { frame = featuresFromCanvas(proc); } catch (_) { return []; }
+
+    const results = [];
+    if (frame.des.rows >= 8) {
+      for (const t of targets) {
+        const r = locate(t, frame, scale);
+        t.hit = !!r; t.score = r ? r.inliers : 0;
+        if (r) results.push(r);
+      }
+    } else {
+      for (const t of targets) { t.hit = false; t.score = 0; }
+    }
+    frame.des.delete();
+    return results;
+  }
+
+  function locate(t, frame, scale) {
+    const matches = new cv.DMatchVectorVector();
+    const src = [], dst = [];
+    try {
+      matcher.knnMatch(t.des, frame.des, matches, 2);
+      for (let i = 0; i < matches.size(); i++) {
+        const pair = matches.get(i);
+        if (pair.size() >= 2) {
+          const a = pair.get(0), b = pair.get(1);
+          if (a.distance < RATIO * b.distance) {
+            src.push(t.pts[a.queryIdx * 2], t.pts[a.queryIdx * 2 + 1]);
+            dst.push(frame.pts[a.trainIdx * 2], frame.pts[a.trainIdx * 2 + 1]);
+          }
+        }
+        safeDelete(pair);
+      }
+    } catch (_) {}
+    matches.delete();
+
+    const n = src.length / 2;
+    if (n < Math.max(6, minInliers * 0.6)) return null;
+
+    let srcM, dstM, mask, H, corners, out, result = null;
+    try {
+      srcM = cv.matFromArray(n, 1, cv.CV_32FC2, src);
+      dstM = cv.matFromArray(n, 1, cv.CV_32FC2, dst);
+      mask = new cv.Mat();
+      H = cv.findHomography(srcM, dstM, cv.RANSAC, 4.0, mask);
+      if (!H || H.empty()) throw 0;
+
+      let inliers = 0;
+      for (let i = 0; i < mask.rows; i++) if (mask.data[i]) inliers++;
+      if (inliers < minInliers) throw 0;
+
+      corners = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, t.w, 0, t.w, t.h, 0, t.h]);
+      out = new cv.Mat();
+      cv.perspectiveTransform(corners, out, H);
+      const q = [];
+      for (let i = 0; i < 4; i++) q.push({ x: out.data32F[i*2] * scale, y: out.data32F[i*2+1] * scale });
+      if (isSaneQuad(q, overlay.width, overlay.height)) result = { t: t, quad: q, inliers: inliers };
+    } catch (_) {}
+
+    [srcM, dstM, mask, H, corners, out].forEach(safeDelete);
+    return result;
+  }
+
+  // Rejects the folded, inverted or needle-thin quads a bad homography produces.
+  function isSaneQuad(q, W, H) {
+    let area = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = q[i], b = q[(i + 1) % 4];
+      if (!isFinite(a.x) || !isFinite(a.y)) return false;
+      area += a.x * b.y - b.x * a.y;
+    }
+    area = Math.abs(area) / 2;
+    if (area < W * H * 0.004 || area > W * H * 3) return false;
+
+    let sign = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = q[i], b = q[(i + 1) % 4], c = q[(i + 2) % 4];
+      const cr = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      if (cr === 0) continue;
+      const s = Math.sign(cr);
+      if (sign === 0) sign = s; else if (s !== sign) return false;
+    }
+    const d = (p, r) => Math.hypot(p.x - r.x, p.y - r.y);
+    const lens = [d(q[0], q[1]), d(q[1], q[2]), d(q[2], q[3]), d(q[3], q[0])];
+    return Math.min.apply(null, lens) > Math.max.apply(null, lens) * 0.12;
+  }
+
+  /* ---------------- drawing ---------------- */
+
+  function draw(results) {
+    const W = overlay.width, H = overlay.height;
+    const S = Math.max(W, H) / 900;
+    const mir = facing === "user";
     ctx.clearRect(0, 0, W, H);
     ctx.lineJoin = "round";
     ctx.textBaseline = "middle";
 
-    for (const d of detections) {
-      let [x, y, w, h] = d.bbox;
-      if (mirrored) x = W - x - w;
+    for (const r of results) {
+      const q = r.quad.map(p => ({ x: mir ? W - p.x : p.x, y: p.y }));
+      const color = r.t.color;
 
-      const color = colorFor(d.class);
-      const pad = 3 * S;
-
-      // translucent fill so the subject stays readable
-      ctx.fillStyle = color + "1F";
-      ctx.fillRect(x, y, w, h);
-
-      // hairline body
-      ctx.strokeStyle = color + "88";
-      ctx.lineWidth = 1.5 * S;
-      ctx.strokeRect(x, y, w, h);
-
-      // signature: heavy corner brackets, like a viewfinder reticle
-      const arm = Math.min(w, h) * 0.22 + 6 * S;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 4 * S;
       ctx.beginPath();
-      ctx.moveTo(x, y + arm);            ctx.lineTo(x, y);            ctx.lineTo(x + arm, y);
-      ctx.moveTo(x + w - arm, y);        ctx.lineTo(x + w, y);        ctx.lineTo(x + w, y + arm);
-      ctx.moveTo(x + w, y + h - arm);    ctx.lineTo(x + w, y + h);    ctx.lineTo(x + w - arm, y + h);
-      ctx.moveTo(x + arm, y + h);        ctx.lineTo(x, y + h);        ctx.lineTo(x, y + h - arm);
-      ctx.stroke();
+      ctx.moveTo(q[0].x, q[0].y);
+      for (let i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+      ctx.closePath();
+      ctx.fillStyle = color + "22"; ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 3.5 * S; ctx.stroke();
 
-      // label chip
-      const pct = Math.round(d.score * 100) + "%";
-      const name = d.class.toUpperCase();
-      ctx.font = `500 ${13 * S}px "DM Mono", ui-monospace, monospace`;
-      const tw = ctx.measureText(name).width;
-      const pw = ctx.measureText(pct).width;
-      const chipH = 22 * S;
-      const chipW = tw + pw + 20 * S;
-      let cy = y - chipH - pad;
-      if (cy < 0) cy = y + pad;                        // flip inside if clipped
-      let cx = Math.min(Math.max(x, 0), W - chipW);
+      for (const p of q) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4.5 * S, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+      }
+
+      const top = q.reduce((a, p) => (p.y < a.y ? p : a), q[0]);
+      const label = r.t.name.toUpperCase(), pts = r.inliers + " PTS";
+      ctx.font = "500 " + (13 * S) + 'px "DM Mono", ui-monospace, monospace';
+      const tw = ctx.measureText(label).width, pw = ctx.measureText(pts).width;
+      const chipH = 22 * S, chipW = tw + pw + 20 * S;
+      const cx = Math.min(Math.max(top.x - chipW / 2, 4), W - chipW - 4);
+      let cy = top.y - chipH - 6 * S;
+      if (cy < 4) cy = top.y + 6 * S;
 
       ctx.fillStyle = color;
-      roundRect(cx, cy, chipW, chipH, 4 * S);
-      ctx.fill();
-
+      roundRect(cx, cy, chipW, chipH, 4 * S); ctx.fill();
       ctx.fillStyle = "#0B0E13";
-      ctx.fillText(name, cx + 7 * S, cy + chipH / 2 + 0.5 * S);
+      ctx.fillText(label, cx + 7 * S, cy + chipH / 2 + 0.5 * S);
       ctx.globalAlpha = 0.6;
-      ctx.fillText(pct, cx + chipW - pw - 7 * S, cy + chipH / 2 + 0.5 * S);
+      ctx.fillText(pts, cx + chipW - pw - 7 * S, cy + chipH / 2 + 0.5 * S);
       ctx.globalAlpha = 1;
     }
-
-    requestAnimationFrame(drawFrame);
   }
 
   function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
-  /* ---------- detection loop ---------- */
+  /* ---------------- loop ---------------- */
 
-  async function detectLoop() {
+  async function loop() {
     while (running) {
-      if (document.hidden || video.readyState < 2) {
-        await new Promise(r => setTimeout(r, 200));
+      if (document.hidden || video.readyState < 2 || !targets.length) {
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        setStatus(targets.length ? "Paused" : "Teach an object first");
+        await new Promise(r => setTimeout(r, 250));
         continue;
       }
       const t0 = performance.now();
-      try {
-        const raw = await model.detect(video, 20, 0.2);
-        detections = raw.filter(d => d.score >= threshold);
-      } catch (e) {
-        console.error(e);
-        await new Promise(r => setTimeout(r, 300));
-      }
+      const results = matchTargets();
+      draw(results);
+      refreshCards();
       const dt = performance.now() - t0;
       fpsSmooth = fpsSmooth ? fpsSmooth * 0.8 + (1000 / dt) * 0.2 : 1000 / dt;
-      setStatus(`${detections.length} found · ${fpsSmooth.toFixed(1)} fps`, true);
-      updateRoster();
-      await tf.nextFrame();
+      setStatus(results.length
+        ? results.length + " found · " + fpsSmooth.toFixed(1) + " fps"
+        : "Searching · " + fpsSmooth.toFixed(1) + " fps",
+        results.length ? "hit" : "live");
+      await new Promise(r => requestAnimationFrame(r));
     }
   }
 
-  function updateRoster() {
-    const counts = new Map();
-    for (const d of detections) counts.set(d.class, (counts.get(d.class) || 0) + 1);
-    if (!counts.size) {
-      roster.innerHTML = '<span class="chip empty">Nothing above threshold</span>';
-      return;
-    }
-    roster.innerHTML = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, n]) =>
-        `<span class="chip" style="color:${colorFor(name)}"><b>${n}</b>&nbsp;${name}</span>`)
-      .join("");
-  }
-
-  /* ---------- lifecycle ---------- */
+  /* ---------------- lifecycle ---------------- */
 
   async function start() {
-    setError("");
-    toggle.disabled = true;
-
+    setError(""); toggle.disabled = true;
     if (!window.isSecureContext) {
-      setError("Camera needs HTTPS. Open this file from an https:// address or localhost.");
-      toggle.disabled = false;
-      return;
+      setError("Camera needs HTTPS. Open this from an https:// address or localhost.");
+      toggle.disabled = false; return;
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setError("This browser can't reach the camera. Use Safari or Chrome on iOS.");
-      toggle.disabled = false;
-      return;
+      toggle.disabled = false; return;
     }
-
     try {
       setStatus("Requesting camera…");
       await openCamera();
-
-      if (!model) {
-        setStatus("Loading model…");
-        note.innerHTML = "Downloading model — this takes a few seconds on first run.";
-        await tf.ready();
-        model = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+      if (!cvReady) {
+        setStatus("Loading vision library…");
+        note.innerHTML = "Downloading the matcher — about <b>10 MB</b>, once.";
+        await loadOpenCV();
       }
-
       running = true;
       cover.hidden = true;
       toggle.textContent = "Stop camera";
       toggle.classList.add("is-running");
-      flipBtn.disabled = false;
-      toggle.disabled = false;
+      flipBtn.disabled = false; toggle.disabled = false;
       requestWakeLock();
-      drawFrame();
-      detectLoop();
+      loop();
     } catch (err) {
       console.error(err);
-      stop();
-      toggle.disabled = false;
-      setError(explain(err));
-      setStatus("Stopped");
+      stop(); toggle.disabled = false;
+      setError(explain(err)); setStatus("Stopped");
     }
   }
 
   function explain(err) {
-    switch (err?.name) {
+    switch (err && err.name) {
       case "NotAllowedError":
-        return "Camera access was blocked. Tap the “aA” icon in Safari's address bar → Website Settings → Camera → Allow, then try again.";
-      case "NotFoundError":
-        return "No camera found on this device.";
-      case "NotReadableError":
-        return "The camera is busy. Close other apps or tabs using it, then try again.";
-      default:
-        return (err?.message || "Something went wrong.") + " Check your connection — the model loads from a CDN.";
+        return "Camera access was blocked. Tap “aA” in Safari's address bar → Website Settings → Camera → Allow, then try again.";
+      case "NotFoundError": return "No camera found on this device.";
+      case "NotReadableError": return "The camera is busy. Close other apps using it, then try again.";
+      default: return (err && err.message) || "Something went wrong.";
     }
   }
 
   function stop() {
-    running = false;
-    detections = [];
-    fpsSmooth = 0;
+    running = false; fpsSmooth = 0;
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     video.srcObject = null;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    for (const t of targets) { t.hit = false; t.score = 0; }
+    refreshCards();
     cover.hidden = false;
     toggle.textContent = "Start camera";
     toggle.classList.remove("is-running");
     flipBtn.disabled = true;
-    roster.innerHTML = '<span class="chip empty">Nothing detected yet</span>';
     setStatus("Idle");
     releaseWakeLock();
   }
 
   async function requestWakeLock() {
-    try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); }
-    catch (_) { /* not critical */ }
+    try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (_) {}
   }
   function releaseWakeLock() {
     if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   }
 
-  /* ---------- events ---------- */
+  /* ---------------- events ---------------- */
 
   toggle.addEventListener("click", () => running ? stop() : start());
 
@@ -484,23 +728,35 @@
     flipBtn.disabled = false;
   });
 
-  thr.addEventListener("input", () => {
-    threshold = thr.value / 100;
-    thrVal.textContent = thr.value + "%";
+  strict.addEventListener("input", () => {
+    minInliers = +strict.value;
+    strictVal.textContent = minInliers + " pts";
   });
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && running && !wakeLock) requestWakeLock();
   });
-
   window.addEventListener("orientationchange", () => setTimeout(fitStage, 400));
   window.addEventListener("pagehide", stop);
 
   if (!window.isSecureContext) {
-    note.innerHTML = "Camera access requires <b>HTTPS</b>. Host this file on an https:// URL or localhost.";
+    note.innerHTML = "Camera access requires <b>HTTPS</b>. Host this on an https:// URL or localhost.";
   }
+
+  renderTargets();
+
+  // Rebuild saved objects in the background once the library is available.
+  (async () => {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); } catch (_) {}
+    if (!saved.length) return;
+    try {
+      await loadOpenCV();
+      for (const rec of saved) { try { targets.push(await buildTarget(rec)); } catch (_) {} }
+      renderTargets();
+    } catch (_) {}
+  })();
 })();
 </script>
 </body>
 </html>
-
